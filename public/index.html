@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Fuel Finder</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg:#0f1117;--surface:#1a1d27;--surface2:#22263a;--border:#2e3248;
+      --accent:#f5a623;--accent2:#e8831a;--text:#e8eaf0;--muted:#7b8099;
+      --green:#4caf7d;--red:#e05c5c;--blue:#5b9cf6;--radius:10px;
+    }
+    body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);height:100vh;display:flex;flex-direction:column;overflow:hidden}
+    /* Header */
+    header{background:var(--surface);border-bottom:1px solid var(--border);padding:10px 16px;display:flex;align-items:center;gap:12px;flex-shrink:0;z-index:1000}
+    header h1{font-size:1.1rem;font-weight:700;color:var(--accent);white-space:nowrap}
+    .search-bar{display:flex;gap:6px;flex:1;max-width:560px}
+    .search-bar input{flex:1;padding:8px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-size:0.875rem;outline:none;transition:border-color .2s}
+    .search-bar input:focus{border-color:var(--accent)}
+    .search-bar input::placeholder{color:var(--muted)}
+    .radius-slider-wrap{display:flex;align-items:center;gap:8px;flex-shrink:0} input[type=range].radius-slider{width:90px;accent-color:var(--accent);cursor:pointer;height:4px} .radius-label{font-size:0.82rem;font-weight:700;color:var(--accent);min-width:44px;white-space:nowrap}
+    .btn{padding:8px 16px;background:var(--accent);color:#0f1117;border:none;border-radius:var(--radius);font-weight:700;font-size:0.875rem;cursor:pointer;transition:background .2s;white-space:nowrap}
+    .btn:hover{background:var(--accent2)}
+    .btn:disabled{opacity:.5;cursor:not-allowed}
+    .btn-sm{padding:5px 12px;font-size:0.78rem}
+    .btn-outline{background:transparent;border:1px solid var(--border);color:var(--text)}
+    .btn-outline:hover{border-color:var(--accent);color:var(--accent);background:transparent}
+    .btn-ghost{background:transparent;border:none;color:var(--muted);font-size:0.85rem;cursor:pointer;padding:6px 10px}
+    .btn-ghost:hover{color:var(--text)}
+    .btn-danger{background:var(--red);color:#fff}
+    .btn-danger:hover{background:#c94444}
+    .btn-success{background:var(--green);color:#fff}
+    .btn-success:hover{background:#3a9165}
+    /* User area in header */
+    .header-user{display:flex;align-items:center;gap:8px;margin-left:auto;flex-shrink:0}
+    .user-chip{background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:5px 12px;font-size:0.8rem;display:flex;align-items:center;gap:6px}
+    .role-badge{font-size:0.65rem;font-weight:700;padding:1px 6px;border-radius:10px;background:var(--accent);color:#0f1117;text-transform:uppercase}
+    .role-badge.admin{background:var(--blue)}
+    /* Layout */
+    .main{display:flex;flex:1;overflow:hidden}
+    /* Sidebar */
+    .sidebar{width:320px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+    .sidebar-header{padding:12px 14px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-shrink:0}
+    .sort-bar{display:flex;gap:4px;padding:8px 14px;border-bottom:1px solid var(--border);flex-shrink:0;flex-wrap:wrap}
+    .sort-pill{padding:4px 10px;border-radius:20px;font-size:0.72rem;font-weight:600;cursor:pointer;border:1px solid var(--border);background:transparent;color:var(--muted);transition:all .15s;white-space:nowrap}
+    .sort-pill.active{background:var(--accent);color:#0f1117;border-color:var(--accent)}
+    .sort-pill:hover:not(.active){border-color:var(--accent);color:var(--accent)}
+    .sidebar-header h2{font-size:0.8rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+    .count-badge{background:var(--accent);color:#0f1117;font-size:0.72rem;font-weight:700;padding:2px 7px;border-radius:20px}
+    .station-list{overflow-y:auto;flex:1}
+    .station-list::-webkit-scrollbar{width:4px}
+    .station-list::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+    /* Station card */
+    .station-card{padding:12px 14px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .15s}
+    .station-card:hover,.station-card.active{background:var(--surface2)}
+    .station-card.active{border-left:3px solid var(--accent)}
+    .station-name{font-weight:600;font-size:0.9rem;margin-bottom:3px;display:flex;align-items:center;gap:6px}
+    .brand-tag{font-size:0.68rem;background:var(--surface2);border:1px solid var(--border);color:var(--muted);padding:1px 5px;border-radius:4px}
+    .station-meta{font-size:0.78rem;color:var(--muted);margin-bottom:6px}
+    .station-footer{display:flex;justify-content:space-between;align-items:center}
+    .distance{font-size:0.78rem;font-weight:600;color:var(--accent)}
+    /* Prices grid */
+    .prices-grid{display:flex;flex-wrap:wrap;gap:4px;margin:6px 0}
+    .price-pill{font-size:0.72rem;font-weight:700;padding:3px 8px;border-radius:6px;background:rgba(76,175,125,.12);color:var(--green);border:1px solid rgba(76,175,125,.25)}
+    .price-pill.no-price{background:transparent;color:var(--muted);border:1px solid var(--border);font-weight:400}
+    .report-btn{font-size:0.72rem;color:var(--blue);background:transparent;border:none;cursor:pointer;padding:0;margin-top:4px}
+    .report-btn:hover{text-decoration:underline}
+    /* Map */
+    #map{flex:1;z-index:0}
+    /* Empty/loading */
+    .empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;flex:1;color:var(--muted);padding:40px 20px;text-align:center}
+    .empty-icon{font-size:2rem}
+    .empty-state p{font-size:0.82rem;line-height:1.5}
+    .spinner{width:28px;height:28px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    /* Modal backdrop */
+    .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:5000;display:flex;align-items:center;justify-content:center;padding:20px}
+    .modal-backdrop.hidden{display:none}
+    .modal{background:var(--surface);border:1px solid var(--border);border-radius:14px;width:100%;max-width:420px;overflow:hidden}
+    .modal-header{padding:18px 20px 14px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+    .modal-header h2{font-size:1rem;font-weight:700}
+    .modal-close{background:none;border:none;color:var(--muted);font-size:1.3rem;cursor:pointer;line-height:1}
+    .modal-close:hover{color:var(--text)}
+    .modal-body{padding:20px}
+    /* Tabs inside modal */
+    .tab-bar{display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:18px}
+    .tab{flex:1;padding:9px;text-align:center;font-size:0.85rem;font-weight:600;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;background:none;border-left:none;border-right:none;border-top:none}
+    .tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+    /* Form */
+    .form-group{margin-bottom:14px}
+    .form-group label{display:block;font-size:0.8rem;color:var(--muted);margin-bottom:5px}
+    .form-group input,.form-group select{width:100%;padding:9px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-size:0.875rem;outline:none;transition:border-color .2s}
+    .form-group input:focus,.form-group select:focus{border-color:var(--accent)}
+    .form-error{font-size:0.78rem;color:var(--red);margin-top:10px;min-height:18px}
+    /* Toast */
+    #toast{position:fixed;bottom:20px;right:20px;padding:10px 16px;border-radius:var(--radius);font-size:0.83rem;font-weight:500;z-index:9999;display:none;max-width:300px}
+    #toast.error{background:var(--red);color:#fff}
+    #toast.success{background:var(--green);color:#fff}
+    /* Leaflet popup override */
+    .leaflet-popup-content-wrapper{background:var(--surface2)!important;color:var(--text)!important;border:1px solid var(--border)!important;border-radius:var(--radius)!important;box-shadow:0 4px 20px rgba(0,0,0,.5)!important}
+    .leaflet-popup-tip{background:var(--surface2)!important}
+    .leaflet-popup-content{margin:12px 14px!important}
+    .popup-name{font-weight:700;font-size:.95rem;margin-bottom:3px}
+    .popup-address{font-size:.78rem;color:var(--muted);margin-bottom:6px}
+    .popup-distance{font-size:.82rem;color:var(--accent);font-weight:600}
+  </style>
+</head>
+<body>
+<header>
+  <h1>⛽ Fuel Finder</h1>
+  <div class="search-bar">
+    <input id="postcodeInput" type="text" placeholder="Postcode (e.g. LL57 2DG)" maxlength="8"/>
+    <div class="radius-slider-wrap">
+      <input type="range" class="radius-slider" id="radiusRange" min="1" max="30" value="10"
+        oninput="document.getElementById('radiusLabel').textContent=this.value+' mi'"/>
+      <span class="radius-label" id="radiusLabel">10 mi</span>
+    </div>
+    <button id="searchBtn" class="btn">Search</button>
+  </div>
+  <div class="header-user" id="headerUser">
+    <button class="btn btn-outline btn-sm" id="openAuthBtn">Login / Register</button>
+  </div>
+</header>
+
+<div class="main">
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <h2>Stations</h2>
+      <span id="countBadge" class="count-badge" style="display:none">0</span>
+    </div>
+    <div class="sort-bar" id="sortBar" style="display:none">
+      <button class="sort-pill active" onclick="setSort('distance')">📏 Nearest</button>
+      <button class="sort-pill" onclick="setSort('E10')">E10</button>
+      <button class="sort-pill" onclick="setSort('Diesel')">Diesel</button>
+      <button class="sort-pill" onclick="setSort('Super Unleaded')">Super Unl.</button>
+      <button class="sort-pill" onclick="setSort('Electric')">Electric</button>
+    </div>
+    <div id="stationList" class="station-list">
+      <div class="empty-state"><div class="empty-icon">🗺️</div><p>Enter a postcode to find nearby petrol stations</p></div>
+    </div>
+  </div>
+  <div id="map"></div>
+</div>
+
+<!-- Auth modal -->
+<div class="modal-backdrop hidden" id="authModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Account</h2>
+      <button class="modal-close" id="authModalClose">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="tab-bar">
+        <button class="tab active" id="tabLogin" onclick="switchTab('login')">Login</button>
+        <button class="tab" id="tabRegister" onclick="switchTab('register')">Register</button>
+      </div>
+      <!-- Login -->
+      <div id="loginForm">
+        <div class="form-group"><label>Email</label><input type="email" id="loginEmail" placeholder="you@example.com"/></div>
+        <div class="form-group"><label>Password</label><input type="password" id="loginPassword" placeholder="Password"/></div>
+        <div class="form-error" id="loginError"></div>
+        <button class="btn" style="width:100%;margin-top:4px" id="loginBtn">Login</button>
+      </div>
+      <!-- Register -->
+      <div id="registerForm" style="display:none">
+        <div class="form-group"><label>Username</label><input type="text" id="regUsername" placeholder="yourname"/></div>
+        <div class="form-group"><label>Email</label><input type="email" id="regEmail" placeholder="you@example.com"/></div>
+        <div class="form-group"><label>Password</label><input type="password" id="regPassword" placeholder="Min 8 characters"/></div>
+        <div class="form-error" id="registerError"></div>
+        <button class="btn" style="width:100%;margin-top:4px" id="registerBtn">Create Account</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Report price modal -->
+<div class="modal-backdrop hidden" id="priceModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Report Price</h2>
+      <button class="modal-close" id="priceModalClose">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:.83rem;color:var(--muted);margin-bottom:14px">Station: <strong id="priceStationName" style="color:var(--text)"></strong></p>
+      <div class="form-group">
+        <label>Fuel Type</label>
+        <select id="priceFuelType">
+          <option value="E10">Unleaded (E10)</option>
+          <option value="Diesel">Diesel</option>
+          <option value="Super Unleaded">Super Unleaded</option>
+          <option value="Electric">Electric (per kWh)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label id="priceLabel">Price (pence per litre)</label>
+        <input type="number" id="priceValue" min="50" max="999" step="0.1" placeholder="e.g. 142.9"/>
+      </div>
+      <div class="form-error" id="priceError"></div>
+      <button class="btn" style="width:100%;margin-top:4px" id="submitPriceBtn">Submit for Review</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ── State ────────────────────────────────────────────────────────────────────
+let currentUser = null;
+let currentToken = null;
+let markers = [];
+let activeCard = null;
+let activeMarker = null;
+let originMarker = null;
+let radiusCircle = null;
+let selectedStationId = null;
+let selectedStationName = null;
+let allStations = [];
+let currentSort = 'distance';
+
+// ── Persistence ──────────────────────────────────────────────────────────────
+function loadSession() {
+  const saved = sessionStorage.getItem('ff_token');
+  const user  = sessionStorage.getItem('ff_user');
+  if (saved && user) { currentToken = saved; currentUser = JSON.parse(user); }
+}
+function saveSession(token, user) {
+  currentToken = token; currentUser = user;
+  sessionStorage.setItem('ff_token', token);
+  sessionStorage.setItem('ff_user', JSON.stringify(user));
+}
+function clearSession() {
+  currentToken = null; currentUser = null;
+  sessionStorage.removeItem('ff_token');
+  sessionStorage.removeItem('ff_user');
+}
+
+// ── API helper ───────────────────────────────────────────────────────────────
+async function api(method, url, body) {
+  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  if (currentToken) opts.headers['Authorization'] = 'Bearer ' + currentToken;
+  if (body) opts.body = JSON.stringify(body);
+  const res = await fetch(url, opts);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Request failed');
+  return data;
+}
+
+// ── Toast ────────────────────────────────────────────────────────────────────
+function toast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = type || 'error';
+  t.style.display = 'block';
+  setTimeout(function() { t.style.display = 'none'; }, 3500);
+}
+
+// ── Header user display ──────────────────────────────────────────────────────
+function renderHeader() {
+  const area = document.getElementById('headerUser');
+  if (!currentUser) {
+    area.innerHTML = '<button class="btn btn-outline btn-sm" id="openAuthBtn">Login / Register</button>';
+    document.getElementById('openAuthBtn').onclick = function() { document.getElementById('authModal').classList.remove('hidden'); };
+    return;
+  }
+  const isAdmin = currentUser.role === 'admin';
+  area.innerHTML =
+    '<div class="user-chip">' +
+    '<span>' + currentUser.username + '</span>' +
+    '<span class="role-badge ' + (isAdmin ? 'admin' : '') + '">' + currentUser.role + '</span>' +
+    '</div>' +
+    (isAdmin ? '<a href="/admin.html" class="btn btn-outline btn-sm" style="text-decoration:none">Admin Panel</a>' : '') +
+    '<button class="btn-ghost" id="logoutBtn">Logout</button>';
+  document.getElementById('logoutBtn').onclick = function() { clearSession(); renderHeader(); toast('Logged out', 'success'); };
+}
+
+// ── Auth modal ───────────────────────────────────────────────────────────────
+function switchTab(tab) {
+  document.getElementById('loginForm').style.display    = tab === 'login'    ? '' : 'none';
+  document.getElementById('registerForm').style.display = tab === 'register' ? '' : 'none';
+  document.getElementById('tabLogin').classList.toggle('active',    tab === 'login');
+  document.getElementById('tabRegister').classList.toggle('active', tab === 'register');
+}
+document.getElementById('authModalClose').onclick = function() { document.getElementById('authModal').classList.add('hidden'); };
+
+document.getElementById('loginBtn').onclick = async function() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPassword').value;
+  document.getElementById('loginError').textContent = '';
+  try {
+    const data = await api('POST', '/api/auth/login', { email, password });
+    saveSession(data.token, data.user);
+    document.getElementById('authModal').classList.add('hidden');
+    renderHeader();
+    toast('Welcome back, ' + data.user.username + '!', 'success');
+  } catch (e) { document.getElementById('loginError').textContent = e.message; }
+};
+
+document.getElementById('registerBtn').onclick = async function() {
+  const username = document.getElementById('regUsername').value.trim();
+  const email    = document.getElementById('regEmail').value.trim();
+  const password = document.getElementById('regPassword').value;
+  document.getElementById('registerError').textContent = '';
+  try {
+    const data = await api('POST', '/api/auth/register', { username, email, password });
+    saveSession(data.token, data.user);
+    document.getElementById('authModal').classList.add('hidden');
+    renderHeader();
+    toast('Account created! Welcome, ' + data.user.username + '!', 'success');
+  } catch (e) { document.getElementById('registerError').textContent = e.message; }
+};
+
+// ── Price modal ──────────────────────────────────────────────────────────────
+document.getElementById('priceModalClose').onclick = function() { document.getElementById('priceModal').classList.add('hidden'); };
+document.getElementById('priceFuelType').onchange = function() {
+  const isElec = this.value === 'Electric';
+  document.getElementById('priceLabel').textContent = isElec ? 'Price (pence per kWh)' : 'Price (pence per litre)';
+  document.getElementById('priceValue').placeholder = isElec ? 'e.g. 35.0' : 'e.g. 142.9';
+};
+
+function openPriceModal(stationId, stationName) {
+  if (!currentUser) { toast('Please log in to report a price', 'error'); document.getElementById('authModal').classList.remove('hidden'); return; }
+  selectedStationId   = stationId;
+  selectedStationName = stationName;
+  document.getElementById('priceStationName').textContent = stationName;
+  document.getElementById('priceValue').value = '';
+  document.getElementById('priceError').textContent = '';
+  document.getElementById('priceModal').classList.remove('hidden');
+}
+
+document.getElementById('submitPriceBtn').onclick = async function() {
+  const fuel_type   = document.getElementById('priceFuelType').value;
+  const price_pence = parseFloat(document.getElementById('priceValue').value);
+  document.getElementById('priceError').textContent = '';
+  if (!price_pence || price_pence < 50 || price_pence > 999) {
+    document.getElementById('priceError').textContent = 'Enter a valid price between 50p and 999p'; return;
+  }
+  try {
+    await api('POST', '/api/prices/submit', { station_id: selectedStationId, fuel_type, price_pence });
+    document.getElementById('priceModal').classList.add('hidden');
+    toast('Price submitted for admin review', 'success');
+  } catch (e) { document.getElementById('priceError').textContent = e.message; }
+};
+
+// ── Map ──────────────────────────────────────────────────────────────────────
+const map = L.map('map', { zoomControl: true }).setView([53.0, -4.0], 10);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+  attribution: '© OpenStreetMap contributors © CARTO', maxZoom: 19,
+}).addTo(map);
+
+function makeIcon(color) {
+  return L.divIcon({
+    className: '',
+    html: '<svg width="26" height="36" viewBox="0 0 26 36" xmlns="http://www.w3.org/2000/svg"><path d="M13 0C5.82 0 0 5.82 0 13c0 9.1 13 23 13 23S26 22.1 26 13C26 5.82 20.18 0 13 0z" fill="' + color + '"/><text x="13" y="17" text-anchor="middle" dominant-baseline="middle" font-size="11" fill="#0f1117">⛽</text></svg>',
+    iconSize: [26, 36], iconAnchor: [13, 36], popupAnchor: [0, -38],
+  });
+}
+const defaultIcon = makeIcon('#f5a623');
+const activeIcon  = makeIcon('#ffffff');
+const originIcon  = L.divIcon({
+  className: '',
+  html: '<svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg"><circle cx="9" cy="9" r="8" fill="#4caf7d" stroke="#0f1117" stroke-width="2"/><circle cx="9" cy="9" r="3" fill="#0f1117"/></svg>',
+  iconSize: [18, 18], iconAnchor: [9, 9],
+});
+
+function clearMap() {
+  markers.forEach(function(m) { map.removeLayer(m); });
+  markers = [];
+  if (originMarker) { map.removeLayer(originMarker); originMarker = null; }
+  if (radiusCircle) { map.removeLayer(radiusCircle); radiusCircle = null; }
+}
+
+// ── Price pills helper ───────────────────────────────────────────────────────
+const FUEL_LABELS = { 'E10': 'E10', 'Diesel': 'DSL', 'Super Unleaded': 'SUL', 'Electric': 'EV' };
+function renderPrices(prices) {
+  const fuels = ['E10', 'Diesel', 'Super Unleaded', 'Electric'];
+  return fuels.map(function(f) {
+    const p = prices && prices[f];
+    return p
+      ? '<span class="price-pill">' + FUEL_LABELS[f] + ' ' + p + 'p</span>'
+      : '<span class="price-pill no-price">' + FUEL_LABELS[f] + ' –</span>';
+  }).join('');
+}
+
+// ── Build sidebar card ───────────────────────────────────────────────────────
+function renderCard(station, marker) {
+  const card = document.createElement('div');
+  card.className = 'station-card';
+  card.innerHTML =
+    '<div class="station-name">' + station.name +
+    (station.brand && station.brand !== station.name ? '<span class="brand-tag">' + station.brand + '</span>' : '') +
+    '</div>' +
+    (station.address ? '<div class="station-meta">📍 ' + station.address + '</div>' : '') +
+    '<div class="prices-grid">' + renderPrices(station.prices) + '</div>' +
+    '<div class="station-footer">' +
+    '<span class="distance">📏 ' + station.distanceMiles + ' mi</span>' +
+    '<button class="report-btn" onclick="event.stopPropagation();openPriceModal(' + station.id + ',\'' + (station.name || '').replace(/'/g, "\\'") + '\')">+ Report price</button>' +
+    '</div>';
+
+  card.addEventListener('click', function() {
+    if (activeCard) activeCard.classList.remove('active');
+    if (activeMarker) activeMarker.setIcon(defaultIcon);
+    card.classList.add('active');
+    marker.setIcon(activeIcon);
+    activeCard = card; activeMarker = marker;
+    map.flyTo([station.lat, station.lon], 15, { duration: 0.8 });
+    marker.openPopup();
+  });
+  return card;
+}
+
+// ── Sort & render sidebar ─────────────────────────────────────────────────────
+function setSort(key) {
+  currentSort = key;
+  document.querySelectorAll('.sort-pill').forEach(function(btn) {
+    btn.classList.toggle('active', btn.textContent.trim().replace('📏 ','') === (key === 'distance' ? 'Nearest' : key));
+  });
+  renderSidebar();
+}
+
+function renderSidebar() {
+  if (!allStations.length) return;
+  const sorted = allStations.slice().sort(function(a, b) {
+    if (currentSort === 'distance') return a.station.distanceMiles - b.station.distanceMiles;
+    const pa = a.station.prices && a.station.prices[currentSort] != null ? a.station.prices[currentSort] : Infinity;
+    const pb = b.station.prices && b.station.prices[currentSort] != null ? b.station.prices[currentSort] : Infinity;
+    if (pa !== pb) return pa - pb;
+    return a.station.distanceMiles - b.station.distanceMiles; // tie-break by distance
+  });
+  activeCard = null;
+  if (activeMarker) { activeMarker.setIcon(defaultIcon); activeMarker = null; }
+  const list = document.createElement('div');
+  sorted.forEach(function(item) {
+    const card = renderCard(item.station, item.marker);
+    item.marker.off('click');
+    item.marker.on('click', function() {
+      if (activeCard) activeCard.classList.remove('active');
+      if (activeMarker) activeMarker.setIcon(defaultIcon);
+      card.classList.add('active'); item.marker.setIcon(activeIcon);
+      activeCard = card; activeMarker = item.marker;
+      card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+    list.appendChild(card);
+  });
+  document.getElementById('stationList').innerHTML = '';
+  document.getElementById('stationList').appendChild(list);
+}
+
+// ── Search ───────────────────────────────────────────────────────────────────
+async function search() {
+  const postcode = document.getElementById('postcodeInput').value.trim();
+  const radiusMi = parseInt(document.getElementById('radiusRange').value);
+  const radius   = (radiusMi * 1.60934).toFixed(1);
+  const btn      = document.getElementById('searchBtn');
+  if (!postcode) { toast('Please enter a postcode', 'error'); return; }
+  btn.disabled = true; btn.textContent = 'Searching…';
+  document.getElementById('stationList').innerHTML = '<div class="empty-state"><div class="spinner"></div><p>Finding stations…</p></div>';
+  document.getElementById('countBadge').style.display = 'none';
+  clearMap(); activeCard = null; activeMarker = null; allStations = []; currentSort = 'distance';
+  document.querySelectorAll('.sort-pill').forEach(function(b,i){b.classList.toggle('active',i===0);});
+  document.getElementById('sortBar').style.display = 'none';
+  try {
+    const data = await api('GET', '/api/stations?postcode=' + encodeURIComponent(postcode) + '&radius=' + radius);
+    originMarker = L.marker([data.origin.lat, data.origin.lon], { icon: originIcon }).addTo(map).bindTooltip('📮 ' + data.origin.display);
+    radiusCircle = L.circle([data.origin.lat, data.origin.lon], { radius: data.radiusKm * 1000, color: '#f5a623', weight: 1, opacity: .4, fillOpacity: .04 }).addTo(map);
+    if (data.stations.length === 0) {
+      document.getElementById('stationList').innerHTML = '<div class="empty-state"><div class="empty-icon">🔍</div><p>No stations found within ' + data.radiusKm + ' km. Try a larger radius.</p></div>';
+      map.flyTo([data.origin.lat, data.origin.lon], 12); return;
+    }
+    const bounds = [[data.origin.lat, data.origin.lon]];
+    data.stations.forEach(function(station) {
+      const popup = '<div class="popup-name">' + station.name + '</div>' +
+        (station.address ? '<div class="popup-address">📍 ' + station.address + '</div>' : '') +
+        '<div class="popup-distance">📏 ' + station.distanceMiles + ' mi</div>';
+      const marker = L.marker([station.lat, station.lon], { icon: defaultIcon }).addTo(map).bindPopup(popup);
+      markers.push(marker);
+      bounds.push([station.lat, station.lon]);
+      allStations.push({ station: station, marker: marker });
+    });
+    document.getElementById('countBadge').textContent = data.stations.length;
+    document.getElementById('countBadge').style.display = 'inline-block';
+    document.getElementById('sortBar').style.display = 'flex';
+    renderSidebar();
+    map.fitBounds(bounds, { padding: [40, 40] });
+  } catch (e) {
+    toast(e.message, 'error');
+    document.getElementById('stationList').innerHTML = '<div class="empty-state"><div class="empty-icon">⚠️</div><p>' + e.message + '</p></div>';
+  } finally {
+    btn.disabled = false; btn.textContent = 'Search';
+  }
+}
+
+document.getElementById('searchBtn').addEventListener('click', search);
+document.getElementById('postcodeInput').addEventListener('keydown', function(e) { if (e.key === 'Enter') search(); });
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+loadSession();
+renderHeader();
+</script>
+</body>
+</html>

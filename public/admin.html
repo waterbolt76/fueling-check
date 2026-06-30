@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Fuel Finder — Admin</title>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg:#0f1117;--surface:#1a1d27;--surface2:#22263a;--border:#2e3248;
+      --accent:#f5a623;--text:#e8eaf0;--muted:#7b8099;
+      --green:#4caf7d;--red:#e05c5c;--blue:#5b9cf6;--radius:10px;
+    }
+    body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+    a{color:var(--accent);text-decoration:none}
+    a:hover{text-decoration:underline}
+    /* Header */
+    header{background:var(--surface);border-bottom:1px solid var(--border);padding:12px 24px;display:flex;align-items:center;gap:16px}
+    header h1{font-size:1.05rem;font-weight:700;color:var(--accent)}
+    .header-right{margin-left:auto;display:flex;align-items:center;gap:10px;font-size:0.85rem;color:var(--muted)}
+    .user-chip{background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:4px 12px;font-size:0.8rem;color:var(--text)}
+    .btn-ghost{background:transparent;border:none;color:var(--muted);font-size:0.85rem;cursor:pointer;padding:4px 8px}
+    .btn-ghost:hover{color:var(--text)}
+    /* Content */
+    .container{max-width:1100px;margin:0 auto;padding:28px 24px}
+    /* Stat cards */
+    .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:28px}
+    .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px}
+    .stat-label{font-size:0.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px}
+    .stat-value{font-size:1.8rem;font-weight:700}
+    .stat-value.pending{color:var(--accent)}
+    .stat-value.approved{color:var(--green)}
+    .stat-value.rejected{color:var(--red)}
+    .stat-value.users{color:var(--blue)}
+    /* Section */
+    .section{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:20px}
+    .section-header{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+    .section-header h2{font-size:0.9rem;font-weight:600}
+    /* Filter tabs */
+    .filter-tabs{display:flex;gap:6px}
+    .filter-tab{padding:5px 14px;border-radius:20px;font-size:0.78rem;font-weight:600;cursor:pointer;border:1px solid var(--border);background:transparent;color:var(--muted);transition:all .15s}
+    .filter-tab.active{background:var(--accent);color:#0f1117;border-color:var(--accent)}
+    /* Table */
+    .table-wrap{overflow-x:auto}
+    table{width:100%;border-collapse:collapse;font-size:0.83rem}
+    th{padding:10px 14px;text-align:left;font-size:0.72rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid var(--border)}
+    td{padding:11px 14px;border-bottom:1px solid var(--border);vertical-align:middle}
+    tr:last-child td{border-bottom:none}
+    tr:hover td{background:var(--surface2)}
+    .station-cell{font-weight:600;color:var(--text)}
+    .address-cell{color:var(--muted);font-size:0.78rem}
+    .fuel-badge{display:inline-block;padding:2px 8px;border-radius:6px;font-size:0.72rem;font-weight:700;background:var(--surface2);border:1px solid var(--border)}
+    .fuel-badge.E10{color:#7ec8e3;border-color:#7ec8e350}
+    .fuel-badge.Diesel{color:#f5a623;border-color:#f5a62350}
+    .fuel-badge.SUL{color:#c084fc;border-color:#c084fc50}
+    .fuel-badge.Electric{color:var(--green);border-color:#4caf7d50}
+    .price-cell{font-weight:700;font-size:0.95rem;color:var(--text)}
+    .submitter{color:var(--blue);font-size:0.8rem}
+    .time-cell{color:var(--muted);font-size:0.75rem;white-space:nowrap}
+    .status-badge{display:inline-block;padding:2px 10px;border-radius:10px;font-size:0.72rem;font-weight:700;text-transform:uppercase}
+    .status-badge.pending{background:rgba(245,166,35,.15);color:var(--accent)}
+    .status-badge.approved{background:rgba(76,175,125,.15);color:var(--green)}
+    .status-badge.rejected{background:rgba(224,92,92,.15);color:var(--red)}
+    .actions{display:flex;gap:6px}
+    .btn-approve{padding:4px 12px;background:var(--green);color:#fff;border:none;border-radius:6px;font-size:0.75rem;font-weight:700;cursor:pointer}
+    .btn-approve:hover{background:#3a9165}
+    .btn-reject{padding:4px 12px;background:var(--red);color:#fff;border:none;border-radius:6px;font-size:0.75rem;font-weight:700;cursor:pointer}
+    .btn-reject:hover{background:#c94444}
+    .empty-row td{text-align:center;padding:32px;color:var(--muted);font-size:0.85rem}
+    /* Toast */
+    #toast{position:fixed;bottom:20px;right:20px;padding:10px 16px;border-radius:var(--radius);font-size:0.83rem;font-weight:500;z-index:9999;display:none;max-width:300px}
+    #toast.error{background:var(--red);color:#fff}
+    #toast.success{background:var(--green);color:#fff}
+    /* Gate */
+    #gate{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:80vh;gap:12px;color:var(--muted)}
+    #gate h2{font-size:1.2rem;color:var(--text)}
+    #gate p{font-size:0.85rem}
+  </style>
+</head>
+<body>
+<header>
+  <h1>⛽ Fuel Finder — Admin Panel</h1>
+  <div class="header-right">
+    <a href="/">← Back to map</a>
+    <span class="user-chip" id="userChip">Loading…</span>
+    <button class="btn-ghost" id="logoutBtn">Logout</button>
+  </div>
+</header>
+
+<!-- Access gate — shown if not admin -->
+<div id="gate" style="display:none">
+  <h2>Access Denied</h2>
+  <p>You need an admin account to view this page.</p>
+  <a href="/">← Go back</a>
+</div>
+
+<!-- Main content -->
+<div class="container" id="adminContent" style="display:none">
+  <!-- Stats -->
+  <div class="stats">
+    <div class="stat-card"><div class="stat-label">Pending</div><div class="stat-value pending" id="statPending">–</div></div>
+    <div class="stat-card"><div class="stat-label">Approved</div><div class="stat-value approved" id="statApproved">–</div></div>
+    <div class="stat-card"><div class="stat-label">Rejected</div><div class="stat-value rejected" id="statRejected">–</div></div>
+    <div class="stat-card"><div class="stat-label">Users</div><div class="stat-value users" id="statUsers">–</div></div>
+  </div>
+
+  <!-- Submissions table -->
+  <div class="section">
+    <div class="section-header">
+      <h2>Price Submissions</h2>
+      <div class="filter-tabs">
+        <button class="filter-tab active" onclick="setFilter('pending')">Pending</button>
+        <button class="filter-tab" onclick="setFilter('approved')">Approved</button>
+        <button class="filter-tab" onclick="setFilter('rejected')">Rejected</button>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Station</th>
+            <th>Fuel</th>
+            <th>Price</th>
+            <th>Submitted by</th>
+            <th>Time</th>
+            <th>Status</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="submissionsBody">
+          <tr class="empty-row"><td colspan="7">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ── Session ──────────────────────────────────────────────────────────────────
+let token = sessionStorage.getItem('ff_token');
+let user  = null;
+try { user = JSON.parse(sessionStorage.getItem('ff_user')); } catch(e) {}
+let currentFilter = 'pending';
+
+function toast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = type || 'error'; t.style.display = 'block';
+  setTimeout(function() { t.style.display = 'none'; }, 3500);
+}
+
+async function api(method, url, body) {
+  const opts = { method, headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token } };
+  if (body) opts.body = JSON.stringify(body);
+  const res  = await fetch(url, opts);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Request failed');
+  return data;
+}
+
+// ── Gate check ───────────────────────────────────────────────────────────────
+if (!user || user.role !== 'admin') {
+  document.getElementById('gate').style.display = 'flex';
+} else {
+  document.getElementById('userChip').textContent = user.username + ' (admin)';
+  document.getElementById('adminContent').style.display = 'block';
+  loadStats();
+  loadSubmissions('pending');
+}
+
+document.getElementById('logoutBtn').onclick = function() {
+  sessionStorage.removeItem('ff_token'); sessionStorage.removeItem('ff_user');
+  window.location.href = '/';
+};
+
+// ── Stats ────────────────────────────────────────────────────────────────────
+async function loadStats() {
+  try {
+    const s = await api('GET', '/api/admin/stats');
+    document.getElementById('statPending').textContent  = s.pending;
+    document.getElementById('statApproved').textContent = s.approved;
+    document.getElementById('statRejected').textContent = s.rejected;
+    document.getElementById('statUsers').textContent    = s.users;
+  } catch(e) { console.error(e); }
+}
+
+// ── Filter ───────────────────────────────────────────────────────────────────
+function setFilter(status) {
+  currentFilter = status;
+  document.querySelectorAll('.filter-tab').forEach(function(btn, i) {
+    btn.classList.toggle('active', ['pending','approved','rejected'][i] === status);
+  });
+  loadSubmissions(status);
+}
+
+// ── Submissions ──────────────────────────────────────────────────────────────
+function fuelBadgeClass(f) {
+  if (f === 'E10') return 'E10';
+  if (f === 'Diesel') return 'Diesel';
+  if (f === 'Super Unleaded') return 'SUL';
+  if (f === 'Electric') return 'Electric';
+  return '';
+}
+
+function timeAgo(dateStr) {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1)  return 'just now';
+  if (mins < 60) return mins + 'm ago';
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24)  return hrs + 'h ago';
+  return Math.floor(hrs / 24) + 'd ago';
+}
+
+async function loadSubmissions(status) {
+  const tbody = document.getElementById('submissionsBody');
+  tbody.innerHTML = '<tr class="empty-row"><td colspan="7">Loading…</td></tr>';
+  try {
+    const rows = await api('GET', '/api/admin/submissions?status=' + status);
+    if (rows.length === 0) {
+      tbody.innerHTML = '<tr class="empty-row"><td colspan="7">No ' + status + ' submissions</td></tr>'; return;
+    }
+    tbody.innerHTML = rows.map(function(r) {
+      const isPending = r.status === 'pending';
+      const priceStr  = r.fuel_type === 'Electric' ? r.price_pence + 'p/kWh' : r.price_pence + 'p/L';
+      return '<tr>' +
+        '<td><div class="station-cell">' + r.station_name + '</div>' +
+        (r.station_address ? '<div class="address-cell">' + r.station_address + '</div>' : '') +
+        '</td>' +
+        '<td><span class="fuel-badge ' + fuelBadgeClass(r.fuel_type) + '">' + r.fuel_type + '</span></td>' +
+        '<td class="price-cell">' + priceStr + '</td>' +
+        '<td class="submitter">@' + r.submitted_by_name + '</td>' +
+        '<td class="time-cell">' + timeAgo(r.submitted_at) + '</td>' +
+        '<td><span class="status-badge ' + r.status + '">' + r.status + '</span></td>' +
+        '<td>' + (isPending ?
+          '<div class="actions">' +
+          '<button class="btn-approve" onclick="approve(' + r.id + ',this)">Approve</button>' +
+          '<button class="btn-reject" onclick="reject(' + r.id + ',this)">Reject</button>' +
+          '</div>'
+          : (r.reviewed_by_name ? '<span style="font-size:.75rem;color:var(--muted)">by @' + r.reviewed_by_name + '</span>' : '')) +
+        '</td></tr>';
+    }).join('');
+  } catch(e) { tbody.innerHTML = '<tr class="empty-row"><td colspan="7">Error: ' + e.message + '</td></tr>'; }
+}
+
+async function approve(id, btn) {
+  btn.disabled = true; btn.textContent = '…';
+  try {
+    await api('POST', '/api/admin/submissions/' + id + '/approve');
+    toast('Price approved and published', 'success');
+    loadStats();
+    loadSubmissions(currentFilter);
+  } catch(e) { toast(e.message, 'error'); btn.disabled = false; btn.textContent = 'Approve'; }
+}
+
+async function reject(id, btn) {
+  btn.disabled = true; btn.textContent = '…';
+  try {
+    await api('POST', '/api/admin/submissions/' + id + '/reject');
+    toast('Submission rejected', 'success');
+    loadStats();
+    loadSubmissions(currentFilter);
+  } catch(e) { toast(e.message, 'error'); btn.disabled = false; btn.textContent = 'Reject'; }
+}
+</script>
+</body>
+</html>
